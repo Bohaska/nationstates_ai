@@ -12,12 +12,11 @@ logging.basicConfig(filename="logs.log",
 
 
 class Option:
-    __slots__ = 'id', 'text', 'index'
+    __slots__ = 'id', 'text'
 
-    def __init__(self, option_id: int, text: str, index: int):
+    def __init__(self, option_id: int, text: str):
         self.id = option_id
         self.text = text
-        self.index = index
 
 
 class Issue:
@@ -31,10 +30,9 @@ class Issue:
 
 
 def huggingface_query(payload, headers, url):
-    request_data = json.dumps(payload)
     while True:
         response = json.loads(
-            requests.request("POST", url, headers=headers, data=request_data).content.decode("utf-8"))
+            requests.request("POST", url, headers=headers, json=payload).content.decode("utf-8"))
         try:
             testing_dict = response["answer"]
             del testing_dict
@@ -62,15 +60,13 @@ def get_issues(nation, password, user_agent):
     for issue in response[0]:
         issue_id = int(issue.attrib["id"])
         option_list = []
-        index = 1
         for stuff in issue:
             if stuff.tag == "TITLE":
                 title = stuff.text
             elif stuff.tag == "TEXT":
                 issue_text = stuff.text
             elif stuff.tag == "OPTION":
-                option_list.append(Option(option_id=int(stuff.attrib["id"]), text=stuff.text, index=index))
-                index += 1
+                option_list.append(Option(option_id=int(stuff.attrib["id"]), text=stuff.text))
         try:
             issue_list.append(Issue(issue_id=issue_id, title=title, text=issue_text, options=option_list))
         except NameError:
@@ -122,10 +118,10 @@ def execute_issues(nation: str, password: str, issues: list, x_pin: str, hf_head
             selected_option = selected_option[12:]
         try:
             selected_option = int(selected_option.strip())
-            for option in issue.options:
-                if selected_option == option.index:
-                    selected_option = option.id
-                    print(selected_option)
+            print(selected_option)
+            logging.info(selected_option)
+            selected_option=issue.options[selected_option-1].id
+            logging.info(f"Final option ID: {selected_option}")
         except ValueError:
             selected_option = selected_option.strip()
             logging.error(f"Response was not an integer, searching for response in options...")
