@@ -22,7 +22,7 @@ Nation -> "nation"
 
 Very Good AI Nation -> "very_good_ai_nation"
 - NATIONSTATES_PASSWORDS: Input your Nationstates passwords, one for each nation you want to use the AI to control.
-- prompts: Input the prompt you want to give to the AI at the beginning of each issue query. 
+- PROMPTS: Input the prompt you want to give to the AI at the beginning of each issue query. 
 
 The prompts will be sent to the AI in this format: "{prompt} 1, 2, 3 or 4?"
 
