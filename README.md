@@ -29,3 +29,7 @@ The prompts will be sent to the AI in this format: "{prompt} 1, 2, 3 or 4?"
 Example: prompt = "Who would Donald Trump agree with,"
 
 Sent query: "Who would Donald Trump agree with, 1, 2, 3, or 4?"
+
+7. Run the bot. 
+
+The logs are outputted to logs.log.
