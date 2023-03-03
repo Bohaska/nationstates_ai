@@ -20,12 +20,14 @@ prompts = ["Who would Donald Trump agree with,", "Which is the best choice,"]
 e.g. Who would Donald Trump agree with, 1, 2, 3, or 4?"""
 
 for index in range(len(NATIONSTATES_PASSWORDS)):
-    print(f"Starting up thread {index+1}...")
-    logging.info(f"Starting up thread {index+1}...")
+    print(f"Starting up thread {index + 1}...")
+    logging.info(f"Starting up thread {index + 1}...")
     ns_ai_thread = threading.Thread(target=ns_ai_bot, args=(
-    NATION[index], NATIONSTATES_PASSWORDS[index], huggingface_headers, API_URL, prompts[index], USER_AGENT))
+        NATION[index], NATIONSTATES_PASSWORDS[index], {"Authorization": f"Bearer {HF_API_TOKEN}"}, API_URL, 
+        prompts[index], USER_AGENT))
     ns_ai_thread.start()
     print(f"Started up thread {index + 1}. Waiting 30 seconds before starting up next thread...")
     logging.info(f"Started up thread {index + 1}. Waiting 30 seconds before starting up next thread...")
     time.sleep(30)
+
 
