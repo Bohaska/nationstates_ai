@@ -5,7 +5,7 @@ How to set up:
 1. Create an account on Huggingface (https://huggingface.co)
 2. Generate a read-access token (https://huggingface.co/settings/tokens)
 3. Find a host for this bot. I use Daki (https://daki.cc)
-4. Create a server. I use 10% CPU, 100mb RAM and 200mb disk storage
+4. Create a server. I use 10% CPU, 100mb RAM and 200mb disk storage. Remember to set the programming language as Python.
 5. Copy the repository and file names. 
 6. Edit python bot.py's environment variables
 - USER_AGENT: I use "email@email.com AI Issue Answering" as the user agent, where email@email.com is your actual email.
