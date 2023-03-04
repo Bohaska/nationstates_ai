@@ -82,8 +82,10 @@ The Issue
 {ns_issue.text}
 
 The Debate"""
+    index = 1
     for option in ns_issue.options:
-        formatted_issue += f"""\n\n{option.id + 1}. {option.text}"""
+        formatted_issue += f"""\n\n{index}. {option.text}"""
+        index += 1
     return formatted_issue
 
 
@@ -120,7 +122,7 @@ def execute_issues(nation: str, password: str, issues: list, x_pin: str, hf_head
             selected_option = int(selected_option.strip())
             print(selected_option)
             logging.info(selected_option)
-            selected_option=issue.options[selected_option-1].id
+            selected_option = issue.options[selected_option-1].id
             logging.info(f"Final option ID: {selected_option}")
         except ValueError:
             selected_option = selected_option.strip()
