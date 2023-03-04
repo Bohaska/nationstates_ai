@@ -7,7 +7,7 @@ How to set up:
 3. Find a host for this bot. I use Daki (https://daki.cc)
 4. Create a server. I use 10% CPU, 100mb RAM and 200mb disk storage. Remember to set the programming language as Python.
 5. Copy the repository and file names. 
-6. Edit python bot.py's environment variables
+6. Edit environment variables in .env
 - USER_AGENT: I use "email@email.com AI Issue Answering" as the user agent, where email@email.com is your actual email.
 - HF_API_TOKEN: Input the read-access token you generated in step 2
 - API_URL: You can keep this the same. The format is ``https://api-inference.huggingface.co/models/`` plus the model name at the end. The default value is ``https://api-inference.huggingface.co/models/distilbert-base-cased-distilled-squad``.
