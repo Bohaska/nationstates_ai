@@ -1,8 +1,8 @@
-import json
-import requests
 import xml.etree.ElementTree as ElementTree
 import logging
 import time
+import aiohttp
+import asyncio
 
 logging.basicConfig(filename="logs.log",
                     filemode='a',
@@ -29,32 +29,35 @@ class Issue:
         self.options = options
 
 
-def huggingface_query(payload, headers, url):
+async def huggingface_query(payload, url, session: aiohttp.ClientSession):
     while True:
-        response = json.loads(
-            requests.request("POST", url, headers=headers, json=payload).content.decode("utf-8"))
-        try:
-            testing_dict = response["answer"]
-            del testing_dict
-            return response
-        except KeyError:
-            print("AI is offline, retrying in 30 seconds...")
-            logging.error("AI is offline, retrying in 30 seconds...")
-            time.sleep(30)
+        """response = json.loads(
+            requests.request("POST", url, headers=headers, json=payload).content.decode("utf-8"))"""
+        async with session:
+            async with session.get(url, json=payload) as response:
+                response = await response.json()
+                try:
+                    testing_dict = response["answer"]
+                    del testing_dict
+                    return response
+                except KeyError:
+                    print("AI is offline, retrying in 30 seconds...")
+                    logging.error("AI is offline, retrying in 30 seconds...")
+                    time.sleep(30)
 
 
-def get_issues(nation, password, user_agent):
+async def get_issues(nation, ns_session):
     url = f"https://www.nationstates.net/cgi-bin/api.cgi"
-    headers = {"X-Password": password, "User-Agent": user_agent}
     params = {"nation": nation, "q": "issues"}
-    response = requests.request("GET", url, headers=headers, params=params)
-    print(response.headers)
-    x_pin = response.headers["X-pin"]
-    response = response.text
+    async with ns_session:
+        async with ns_session.get(url, params=params) as response:
+            """logging.info(f"Received cookies: {len(response.cookies)}")
+            logging.info(response.headers)"""
+            ns_session.headers.add("X-pin", response.headers["X-pin"])
+            response = await response.text()
     with open("issues.txt", "a") as myfile:
         myfile.write(response)
     logging.info(response)
-    print(response)
     response = ElementTree.fromstring(response)
     issue_list = []
     for issue in response[0]:
@@ -71,7 +74,12 @@ def get_issues(nation, password, user_agent):
             issue_list.append(Issue(issue_id=issue_id, title=title, text=issue_text, options=option_list))
         except NameError:
             pass
-    return [issue_list, x_pin]
+    for issue in issue_list:
+        logging.info(format_issue(issue))
+        print(f"Issue id {issue.id}: {format_issue(issue)}")
+        with open("issues.txt", "a") as myfile:
+            myfile.write(format_issue(issue))
+    return [issue_list, ns_session]
 
 
 def format_issue(ns_issue: Issue):
@@ -99,19 +107,19 @@ def format_question(ns_issue: Issue, prompt: str):
     return question
 
 
-def execute_issues(nation: str, password: str, issues: list, x_pin: str, hf_headers: str, hf_url, prompt: str,
-                   user_agent):
+async def execute_issues(nation: str, issues: list, hf_url: str, prompt: str,
+                         huggingface_session: aiohttp.ClientSession, ns_session: aiohttp.ClientSession):
     logging.info(f"Executing {len(issues)} issues...")
     execute = []
     for issue in issues:
         logging.info(f"Contacting AI...")
-        selected_option = huggingface_query(
+        selected_option = await huggingface_query(
             {
                 "inputs": {
                     "question": format_question(issue, prompt),
                     "context": format_issue(issue),
                 }
-            }, hf_headers, hf_url
+            }, hf_url, huggingface_session
         )
         print(str(selected_option))
         selected_option = selected_option["answer"]
@@ -122,7 +130,7 @@ def execute_issues(nation: str, password: str, issues: list, x_pin: str, hf_head
             selected_option = int(selected_option.strip())
             print(selected_option)
             logging.info(selected_option)
-            selected_option = issue.options[selected_option-1].id
+            selected_option = issue.options[selected_option - 1].id
             logging.info(f"Final option ID: {selected_option}")
         except ValueError:
             selected_option = selected_option.strip()
@@ -134,37 +142,44 @@ def execute_issues(nation: str, password: str, issues: list, x_pin: str, hf_head
                     break
         logging.info(f"Executing issue...")
         issue_execution_url = f"https://www.nationstates.net/cgi-bin/api.cgi"
-        headers = {"X-Password": password, "User-Agent": user_agent, "X-Pin": x_pin}
         params = {"nation": nation, "c": "issue", "issue": issue.id, "option": selected_option}
-        issue_response = requests.request("GET", issue_execution_url, headers=headers, params=params)
-        print(str(issue_response.headers))
-        execute.append(issue_response.text)
+        async with ns_session.get(issue_execution_url, params=params) as issue_response:
+            if issue_response.status == 200:
+                logging.info(f"Executed issue.")
+            else:
+                logging.info(f"Issue execution failed with error code {issue_response.status}")
+                print(f"Issue execution failed with error code {issue_response.status}")
+                return execute
+            issue_response = await issue_response.text()
+        execute.append(issue_response)
         with open("issue_results.txt", "a") as myfile:
-            myfile.write(issue_response.text)
-        if issue_response.status_code == 200:
-            logging.info(f"Executed issue.")
-        else:
-            logging.info(f"Issue execution failed with error code {issue_response.status_code}")
-            print(f"Issue execution failed with error code {issue_response.status_code}")
-            return execute
-    return execute
+            myfile.write(issue_response)
+    return [execute, aiohttp.ClientSession(headers=ns_session.headers)]
 
 
-def time_to_next_issue(nation: str, password: str, x_pin: str, user_agent):
+async def time_to_next_issue(nation: str, ns_session: aiohttp.ClientSession):
     url = "https://www.nationstates.net/cgi-bin/api.cgi"
-    headers = {"X-Password": password, "User-Agent": user_agent, "X-Pin": x_pin}
     params = {"nation": nation, "q": "nextissuetime"}
-    response = requests.request("GET", url, headers=headers, params=params)
-    return response
+    async with ns_session:
+        async with ns_session.get(url, params=params) as response:
+            response = await response.text()
+            next_issue_time = int(ElementTree.fromstring(response)[0].text) - time.time() + 10
+            return next_issue_time
 
 
-def ns_ai_bot(nation, password, headers, hf_url, prompt, user_agent):
+async def ns_ai_bot(nation, password, headers, hf_url, prompt, user_agent, index: int):
+    print(f"""Nation {nation} prepared. 
+    Sleeping for {index*30} seconds before starting to avoid rate limits...""")
+    logging.info(f"""Nation {nation} prepared. 
+    Sleeping for {index*30} seconds before starting to avoid rate limits...""")
+    await asyncio.sleep(index*30)
+    print(f"""Nation {nation} has woke up and will start automatically answering issues!""")
+    logging.info(f"""Nation {nation} has woke up and will start automatically answering issues!""")
     while True:
-        issues = get_issues(nation, password, user_agent)
-        execute_issues(nation, password, issues[0], issues[1], headers, hf_url, prompt, user_agent)
-        next_issue = time_to_next_issue(nation, password, issues[1], user_agent).text
-        next_issue_time = int(ElementTree.fromstring(next_issue)[0].text) \
-                          - time.time() + 10
-        logging.info(f"Sleeping {next_issue_time} seconds until next issue...")
-        print(f"Sleeping {next_issue_time} seconds until next issue...")
-        time.sleep(next_issue_time)
+        ns_session = aiohttp.ClientSession(headers={"X-Password": password, "User-Agent": user_agent})
+        issues = await get_issues(nation, ns_session)
+        new_session = await execute_issues(nation, issues[0], hf_url, prompt, aiohttp.ClientSession(headers=headers), issues[1])
+        next_issue_time = await time_to_next_issue(nation, new_session[1])
+        logging.info(f"Nation {nation} sleeping {next_issue_time} seconds until next issue...")
+        print(f"Nation {nation} sleeping {next_issue_time} seconds until next issue...")
+        await asyncio.sleep(next_issue_time)

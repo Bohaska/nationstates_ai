@@ -1,6 +1,5 @@
 from nationstates_ai import ns_ai_bot
-import threading
-import time
+import asyncio
 import logging
 import dotenv
 import json
@@ -22,13 +21,15 @@ NATIONSTATES_PASSWORDS = json.loads(env_variables["NATIONSTATES_PASSWORDS"])
 NATIONS = json.loads(env_variables["NATIONS"])
 PROMPTS = json.loads(env_variables["PROMPTS"])
 
-for index in range(len(NATIONSTATES_PASSWORDS)):
-    print(f"Starting up thread {index + 1}...")
-    logging.info(f"Starting up thread {index + 1}...")
-    ns_ai_thread = threading.Thread(target=ns_ai_bot, args=(
-        NATIONS[index], NATIONSTATES_PASSWORDS[index], {"Authorization": f"Bearer {HF_API_TOKEN}"}, API_URL,
-        PROMPTS[index], USER_AGENT))
-    ns_ai_thread.start()
-    print(f"Started up thread {index + 1}. Waiting 30 seconds before starting up next thread...")
-    logging.info(f"Started up thread {index + 1}. Waiting 30 seconds before starting up next thread...")
-    time.sleep(30)
+
+async def run_all_ais(user_agent, hf_api_token, api_url, ns_passwords, nations, prompts):
+    ns_ai_coroutines = []
+    for index in range(len(ns_passwords)):
+        ns_ai_coroutines.append(ns_ai_bot(
+            nations[index], ns_passwords[index], {"Authorization": f"Bearer {hf_api_token}"}, api_url,
+            prompts[index], user_agent, index))
+    thing = await asyncio.gather(*ns_ai_coroutines)
+    return thing
+
+loop = asyncio.get_event_loop()
+loop.run_until_complete(run_all_ais(USER_AGENT, HF_API_TOKEN, API_URL, NATIONSTATES_PASSWORDS, NATIONS, PROMPTS))
