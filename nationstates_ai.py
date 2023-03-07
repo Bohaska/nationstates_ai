@@ -38,10 +38,31 @@ async def manage_ratelimit(nation: str, response: aiohttp.ClientResponse):
         print(f"Resumed nation {nation} after sleeping for 30 seconds to avoid rate-limits.")
 
 
+async def parse_issue(issue_text):
+    issue_text = ElementTree.fromstring(issue_text)
+    issue_list = []
+    for issue in issue_text[0]:
+        issue_id = int(issue.attrib["id"])
+        option_list = []
+        for stuff in issue:
+            if stuff.tag == "TITLE":
+                title = stuff.text
+            elif stuff.tag == "TEXT":
+                issue_text = stuff.text
+            elif stuff.tag == "OPTION":
+                option_list.append(Option(option_id=int(stuff.attrib["id"]), text=stuff.text))
+        try:
+            issue_list.append(Issue(issue_id=issue_id, title=title, text=issue_text, options=option_list))
+        except NameError:
+            pass
+    return issue_list
+
+
 async def huggingface_query(payload, url, session: aiohttp.ClientSession):
     while True:
         """response = json.loads(
             requests.request("POST", url, headers=headers, json=payload).content.decode("utf-8"))"""
+        session = aiohttp.ClientSession(headers=session.headers)
         async with session:
             async with session.get(url, json=payload) as response:
                 response = await response.json()
@@ -68,22 +89,7 @@ async def get_issues(nation, ns_session):
     with open("issues.txt", "a") as myfile:
         myfile.write(response)
     logging.info(response)
-    response = ElementTree.fromstring(response)
-    issue_list = []
-    for issue in response[0]:
-        issue_id = int(issue.attrib["id"])
-        option_list = []
-        for stuff in issue:
-            if stuff.tag == "TITLE":
-                title = stuff.text
-            elif stuff.tag == "TEXT":
-                issue_text = stuff.text
-            elif stuff.tag == "OPTION":
-                option_list.append(Option(option_id=int(stuff.attrib["id"]), text=stuff.text))
-        try:
-            issue_list.append(Issue(issue_id=issue_id, title=title, text=issue_text, options=option_list))
-        except NameError:
-            pass
+    issue_list = await parse_issue(response)
     for issue in issue_list:
         logging.info(format_issue(issue))
         print(f"Issue id {issue.id}: {format_issue(issue)}")
@@ -181,10 +187,10 @@ async def time_to_next_issue(nation: str, ns_session: aiohttp.ClientSession):
 
 async def ns_ai_bot(nation, password, headers, hf_url, prompt, user_agent, index: int):
     print(f"""Nation {nation} prepared. 
-    Sleeping for {index*30} seconds before starting to avoid rate limits...""")
+    Sleeping for {index * 30} seconds before starting to avoid rate limits...""")
     logging.info(f"""Nation {nation} prepared. 
-    Sleeping for {index*30} seconds before starting to avoid rate limits...""")
-    await asyncio.sleep(index*30)
+    Sleeping for {index * 30} seconds before starting to avoid rate limits...""")
+    await asyncio.sleep(index * 30)
     print(f"""Nation {nation} has woke up and will start automatically answering issues!""")
     logging.info(f"""Nation {nation} has woke up and will start automatically answering issues!""")
     while True:
