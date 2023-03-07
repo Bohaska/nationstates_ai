@@ -29,6 +29,15 @@ class Issue:
         self.options = options
 
 
+async def manage_ratelimit(nation: str, response: aiohttp.ClientResponse):
+    if int(response.headers["X-Ratelimit-Requests-Seen"]) > 30:
+        logging.info(f"Pausing nation {nation} for 30 seconds to avoid rate-limits.")
+        print(f"Pausing nation {nation} for 30 seconds to avoid rate-limits.")
+        await asyncio.sleep(30)
+        logging.info(f"Resumed nation {nation} after sleeping for 30 seconds to avoid rate-limits.")
+        print(f"Resumed nation {nation} after sleeping for 30 seconds to avoid rate-limits.")
+
+
 async def huggingface_query(payload, url, session: aiohttp.ClientSession):
     while True:
         """response = json.loads(
@@ -51,6 +60,7 @@ async def get_issues(nation, ns_session):
     params = {"nation": nation, "q": "issues"}
     async with ns_session:
         async with ns_session.get(url, params=params) as response:
+            await manage_ratelimit(nation, response)
             """logging.info(f"Received cookies: {len(response.cookies)}")
             logging.info(response.headers)"""
             ns_session.headers.add("X-pin", response.headers["X-pin"])
@@ -149,7 +159,9 @@ async def execute_issues(nation: str, issues: list, hf_url: str, prompt: str,
             else:
                 logging.info(f"Issue execution failed with error code {issue_response.status}")
                 print(f"Issue execution failed with error code {issue_response.status}")
-                return execute
+                await manage_ratelimit(nation, issue_response)
+                return [execute, aiohttp.ClientSession(headers=ns_session.headers)]
+            await manage_ratelimit(nation, issue_response)
             issue_response = await issue_response.text()
         execute.append(issue_response)
         with open("issue_results.txt", "a") as myfile:
@@ -178,7 +190,8 @@ async def ns_ai_bot(nation, password, headers, hf_url, prompt, user_agent, index
     while True:
         ns_session = aiohttp.ClientSession(headers={"X-Password": password, "User-Agent": user_agent})
         issues = await get_issues(nation, ns_session)
-        new_session = await execute_issues(nation, issues[0], hf_url, prompt, aiohttp.ClientSession(headers=headers), issues[1])
+        new_session = await execute_issues(nation, issues[0], hf_url, prompt, aiohttp.ClientSession(headers=headers),
+                                           issues[1])
         next_issue_time = await time_to_next_issue(nation, new_session[1])
         logging.info(f"Nation {nation} sleeping {next_issue_time} seconds until next issue...")
         print(f"Nation {nation} sleeping {next_issue_time} seconds until next issue...")
