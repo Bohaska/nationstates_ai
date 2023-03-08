@@ -79,6 +79,7 @@ async def huggingface_query(payload, url, session: aiohttp.ClientSession):
 async def get_issues(nation, ns_session):
     url = f"https://www.nationstates.net/cgi-bin/api.cgi"
     params = {"nation": nation, "q": "issues"}
+    ns_session = aiohttp.ClientSession(headers=ns_session.headers)
     async with ns_session:
         async with ns_session.get(url, params=params) as response:
             await manage_ratelimit(nation, response)
