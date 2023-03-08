@@ -64,7 +64,7 @@ async def huggingface_query(payload, url, session: aiohttp.ClientSession):
             requests.request("POST", url, headers=headers, json=payload).content.decode("utf-8"))"""
         session = aiohttp.ClientSession(headers=session.headers)
         async with session:
-            async with session.get(url, json=payload) as response:
+            async with session.post(url, json=payload) as response:
                 response = await response.json()
                 try:
                     testing_dict = response["answer"]
@@ -133,7 +133,7 @@ async def execute_issues(nation: str, issues: list, hf_url: str, prompt: str,
             {
                 "inputs": {
                     "question": format_question(issue, prompt),
-                    "context": format_issue(issue),
+                    "context": format_issue(issue)
                 }
             }, hf_url, huggingface_session
         )
