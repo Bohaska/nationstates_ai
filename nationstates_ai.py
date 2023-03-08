@@ -4,15 +4,17 @@ import time
 import aiohttp
 import asyncio
 
-logging.basicConfig(filename="logs.log",
-                    filemode='a',
-                    format='%(asctime)s,%(msecs)d %(name)s %(levelname)s %(message)s',
-                    datefmt='%H:%M:%S',
-                    level=logging.DEBUG)
+logging.basicConfig(
+    filename="logs.log",
+    filemode="a",
+    format="%(asctime)s,%(msecs)d %(name)s %(levelname)s %(message)s",
+    datefmt="%H:%M:%S",
+    level=logging.DEBUG,
+)
 
 
 class Option:
-    __slots__ = 'id', 'text'
+    __slots__ = "id", "text"
 
     def __init__(self, option_id: int, text: str):
         self.id = option_id
@@ -20,7 +22,7 @@ class Option:
 
 
 class Issue:
-    __slots__ = 'id', 'title', 'text', 'options'
+    __slots__ = "id", "title", "text", "options"
 
     def __init__(self, issue_id: int, title: str, text: str, options: list):
         self.id = issue_id
@@ -34,8 +36,12 @@ async def manage_ratelimit(nation: str, response: aiohttp.ClientResponse):
         logging.info(f"Pausing nation {nation} for 30 seconds to avoid rate-limits.")
         print(f"Pausing nation {nation} for 30 seconds to avoid rate-limits.")
         await asyncio.sleep(30)
-        logging.info(f"Resumed nation {nation} after sleeping for 30 seconds to avoid rate-limits.")
-        print(f"Resumed nation {nation} after sleeping for 30 seconds to avoid rate-limits.")
+        logging.info(
+            f"Resumed nation {nation} after sleeping for 30 seconds to avoid rate-limits."
+        )
+        print(
+            f"Resumed nation {nation} after sleeping for 30 seconds to avoid rate-limits."
+        )
 
 
 async def parse_issue(issue_text):
@@ -50,9 +56,18 @@ async def parse_issue(issue_text):
             elif stuff.tag == "TEXT":
                 issue_stuff = stuff.text
             elif stuff.tag == "OPTION":
-                option_list.append(Option(option_id=int(stuff.attrib["id"]), text=stuff.text))
+                option_list.append(
+                    Option(option_id=int(stuff.attrib["id"]), text=stuff.text)
+                )
         try:
-            issue_list.append(Issue(issue_id=issue_id, title=title, text=issue_stuff, options=option_list))
+            issue_list.append(
+                Issue(
+                    issue_id=issue_id,
+                    title=title,
+                    text=issue_stuff,
+                    options=option_list,
+                )
+            )
         except NameError:
             pass
     return issue_list
@@ -61,7 +76,8 @@ async def parse_issue(issue_text):
 async def huggingface_query(payload, url, session: aiohttp.ClientSession):
     while True:
         """response = json.loads(
-            requests.request("POST", url, headers=headers, json=payload).content.decode("utf-8"))"""
+        requests.request("POST", url, headers=headers, json=payload).content.decode("utf-8"))
+        """
         session = aiohttp.ClientSession(headers=session.headers)
         async with session:
             async with session.post(url, json=payload) as response:
@@ -119,13 +135,21 @@ def format_question(ns_issue: Issue, prompt: str):
     for number in range(1, len(ns_issue.options)):
         number_string += f" {number},"
     number_string += f" or {len(ns_issue.options)}"
-    question = f"{prompt}{number_string}? Only input an integer. Other responses will not " \
-               f"be accepted."
+    question = (
+        f"{prompt}{number_string}? Only input an integer. Other responses will not "
+        f"be accepted."
+    )
     return question
 
 
-async def execute_issues(nation: str, issues: list, hf_url: str, prompt: str,
-                         huggingface_session: aiohttp.ClientSession, ns_session: aiohttp.ClientSession):
+async def execute_issues(
+    nation: str,
+    issues: list,
+    hf_url: str,
+    prompt: str,
+    huggingface_session: aiohttp.ClientSession,
+    ns_session: aiohttp.ClientSession,
+):
     logging.info(f"Executing {len(issues)} issues...")
     execute = []
     for issue in issues:
@@ -134,9 +158,11 @@ async def execute_issues(nation: str, issues: list, hf_url: str, prompt: str,
             {
                 "inputs": {
                     "question": format_question(issue, prompt),
-                    "context": format_issue(issue)
+                    "context": format_issue(issue),
                 }
-            }, hf_url, huggingface_session
+            },
+            hf_url,
+            huggingface_session,
         )
         print(str(selected_option))
         selected_option = selected_option["answer"]
@@ -151,7 +177,9 @@ async def execute_issues(nation: str, issues: list, hf_url: str, prompt: str,
             logging.info(f"Final option ID: {selected_option}")
         except ValueError:
             selected_option = selected_option.strip()
-            logging.error(f"Response was not an integer, searching for response in options...")
+            logging.error(
+                f"Response was not an integer, searching for response in options..."
+            )
             for option in issue.options:
                 if selected_option in option.text:
                     selected_option = option.id
@@ -159,13 +187,20 @@ async def execute_issues(nation: str, issues: list, hf_url: str, prompt: str,
                     break
         logging.info(f"Executing issue...")
         issue_execution_url = f"https://www.nationstates.net/cgi-bin/api.cgi"
-        params = {"nation": nation, "c": "issue", "issue": issue.id, "option": selected_option}
+        params = {
+            "nation": nation,
+            "c": "issue",
+            "issue": issue.id,
+            "option": selected_option,
+        }
         ns_session = aiohttp.ClientSession(headers=ns_session.headers)
         async with ns_session.get(issue_execution_url, params=params) as issue_response:
             if issue_response.status == 200:
                 logging.info(f"Executed issue.")
             else:
-                logging.info(f"Issue execution failed with error code {issue_response.status}")
+                logging.info(
+                    f"Issue execution failed with error code {issue_response.status}"
+                )
                 print(f"Issue execution failed with error code {issue_response.status}")
                 await manage_ratelimit(nation, issue_response)
                 return [execute, aiohttp.ClientSession(headers=ns_session.headers)]
@@ -183,24 +218,44 @@ async def time_to_next_issue(nation: str, ns_session: aiohttp.ClientSession):
     async with ns_session:
         async with ns_session.get(url, params=params) as response:
             response = await response.text()
-            next_issue_time = int(ElementTree.fromstring(response)[0].text) - time.time() + 10
+            next_issue_time = (
+                int(ElementTree.fromstring(response)[0].text) - time.time() + 10
+            )
             return next_issue_time
 
 
 async def ns_ai_bot(nation, password, headers, hf_url, prompt, user_agent, index: int):
-    print(f"""Nation {nation} prepared. 
-    Sleeping for {index * 30} seconds before starting to avoid rate limits...""")
-    logging.info(f"""Nation {nation} prepared. 
-    Sleeping for {index * 30} seconds before starting to avoid rate limits...""")
+    print(
+        f"""Nation {nation} prepared. 
+    Sleeping for {index * 30} seconds before starting to avoid rate limits..."""
+    )
+    logging.info(
+        f"""Nation {nation} prepared. 
+    Sleeping for {index * 30} seconds before starting to avoid rate limits..."""
+    )
     await asyncio.sleep(index * 30)
-    print(f"""Nation {nation} has woke up and will start automatically answering issues!""")
-    logging.info(f"""Nation {nation} has woke up and will start automatically answering issues!""")
+    print(
+        f"""Nation {nation} has woke up and will start automatically answering issues!"""
+    )
+    logging.info(
+        f"""Nation {nation} has woke up and will start automatically answering issues!"""
+    )
     while True:
-        ns_session = aiohttp.ClientSession(headers={"X-Password": password, "User-Agent": user_agent})
+        ns_session = aiohttp.ClientSession(
+            headers={"X-Password": password, "User-Agent": user_agent}
+        )
         issues = await get_issues(nation, ns_session)
-        new_session = await execute_issues(nation, issues[0], hf_url, prompt, aiohttp.ClientSession(headers=headers),
-                                           issues[1])
+        new_session = await execute_issues(
+            nation,
+            issues[0],
+            hf_url,
+            prompt,
+            aiohttp.ClientSession(headers=headers),
+            issues[1],
+        )
         next_issue_time = await time_to_next_issue(nation, new_session[1])
-        logging.info(f"Nation {nation} sleeping {next_issue_time} seconds until next issue...")
+        logging.info(
+            f"Nation {nation} sleeping {next_issue_time} seconds until next issue..."
+        )
         print(f"Nation {nation} sleeping {next_issue_time} seconds until next issue...")
         await asyncio.sleep(next_issue_time)
