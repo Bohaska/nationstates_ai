@@ -48,11 +48,11 @@ async def parse_issue(issue_text):
             if stuff.tag == "TITLE":
                 title = stuff.text
             elif stuff.tag == "TEXT":
-                issue_text = stuff.text
+                issue_stuff = stuff.text
             elif stuff.tag == "OPTION":
                 option_list.append(Option(option_id=int(stuff.attrib["id"]), text=stuff.text))
         try:
-            issue_list.append(Issue(issue_id=issue_id, title=title, text=issue_text, options=option_list))
+            issue_list.append(Issue(issue_id=issue_id, title=title, text=issue_stuff, options=option_list))
         except NameError:
             pass
     return issue_list
@@ -159,6 +159,7 @@ async def execute_issues(nation: str, issues: list, hf_url: str, prompt: str,
         logging.info(f"Executing issue...")
         issue_execution_url = f"https://www.nationstates.net/cgi-bin/api.cgi"
         params = {"nation": nation, "c": "issue", "issue": issue.id, "option": selected_option}
+        ns_session = aiohttp.ClientSession(headers=ns_session.headers)
         async with ns_session.get(issue_execution_url, params=params) as issue_response:
             if issue_response.status == 200:
                 logging.info(f"Executed issue.")
