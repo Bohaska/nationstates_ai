@@ -89,7 +89,7 @@ async def huggingface_query(payload, url, session: aiohttp.ClientSession):
                 except KeyError:
                     print("AI is offline, retrying in 30 seconds...")
                     logging.error("AI is offline, retrying in 30 seconds...")
-                    time.sleep(30)
+                    await asyncio.sleep(30)
 
 
 async def get_issues(nation, ns_session):
@@ -180,10 +180,12 @@ async def execute_issues(
             logging.error(
                 f"Response was not an integer, searching for response in options..."
             )
+            counter = 0
             for option in issue.options:
+                counter += 1
                 if selected_option in option.text:
                     selected_option = option.id
-                    print(f"Found response in option id {selected_option}")
+                    print(f"Found response in option number {counter}")
                     break
         logging.info(f"Executing issue...")
         issue_execution_url = f"https://www.nationstates.net/cgi-bin/api.cgi"
