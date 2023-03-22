@@ -31,16 +31,16 @@ class Issue:
         self.options = options
 
 
-async def manage_ratelimit(nation: str, response: aiohttp.ClientResponse):
+async def manage_ratelimit(response: aiohttp.ClientResponse):
     if int(response.headers["X-Ratelimit-Requests-Seen"]) > 30:
-        logging.info(f"Pausing nation {nation} for 30 seconds to avoid rate-limits.")
-        print(f"Pausing nation {nation} for 30 seconds to avoid rate-limits.")
-        await asyncio.sleep(30)
+        logging.info(f"Pausing server for 30 seconds to avoid rate-limits.")
+        print(f"Pausing server for 30 seconds to avoid rate-limits.")
+        time.sleep(30)
         logging.info(
-            f"Resumed nation {nation} after sleeping for 30 seconds to avoid rate-limits."
+            f"Resumed server after sleeping for 30 seconds to avoid rate-limits."
         )
         print(
-            f"Resumed nation {nation} after sleeping for 30 seconds to avoid rate-limits."
+            f"Resumed server after sleeping for 30 seconds to avoid rate-limits."
         )
 
 
@@ -98,7 +98,7 @@ async def get_issues(nation, ns_session):
     ns_session = aiohttp.ClientSession(headers=ns_session.headers)
     async with ns_session:
         async with ns_session.get(url, params=params) as response:
-            await manage_ratelimit(nation, response)
+            await manage_ratelimit(response)
             """logging.info(f"Received cookies: {len(response.cookies)}")
             logging.info(response.headers)"""
             ns_session.headers.add("X-pin", response.headers["X-pin"])
@@ -204,9 +204,9 @@ async def execute_issues(
                     f"Issue execution failed with error code {issue_response.status}"
                 )
                 print(f"Issue execution failed with error code {issue_response.status}")
-                await manage_ratelimit(nation, issue_response)
+                await manage_ratelimit(issue_response)
                 return [execute, aiohttp.ClientSession(headers=ns_session.headers)]
-            await manage_ratelimit(nation, issue_response)
+            await manage_ratelimit(issue_response)
             issue_response = await issue_response.text()
         execute.append(issue_response)
         with open("issue_results.txt", "a") as myfile:
@@ -244,7 +244,7 @@ async def ns_ai_bot(nation, password, headers, hf_url, prompt, user_agent, index
     )
     while True:
         ns_session = aiohttp.ClientSession(
-            headers={"X-Password": password, "User-Agent": user_agent}
+            headers={"X-Password": password, "User-Agent": user_agent + " Nationstates AI v0.1.2-alpha"}
         )
         issues = await get_issues(nation, ns_session)
         new_session = await execute_issues(
