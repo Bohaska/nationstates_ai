@@ -35,7 +35,7 @@ async def run_all_ais(
     counter = 0
     for index in range(len(ns_passwords)):
         if cur.execute("SELECT name FROM sqlite_master WHERE name='next_issue_time'").fetchone() is not None:
-            timestamp = cur.execute("SELECT timestamp FROM next_issue_time WHERE nation = ?", (nations[index],)).fetchone()
+            timestamp = cur.execute("SELECT timestamp FROM next_issue_time WHERE nation = ?", (nations[index],)).fetchone()[0]
             if timestamp is not None and timestamp > time.time():
                 ns_ai_coroutines.append(
                     ns_ai_bot(
