@@ -3,6 +3,7 @@ import logging
 import time
 import aiohttp
 import asyncio
+import sqlite3
 
 logging.basicConfig(
     filename="logs.log",
@@ -220,28 +221,39 @@ async def time_to_next_issue(nation: str, ns_session: aiohttp.ClientSession):
     async with ns_session:
         async with ns_session.get(url, params=params) as response:
             response = await response.text()
+            timestamp = int(ElementTree.fromstring(response)[0].text)
             next_issue_time = (
-                int(ElementTree.fromstring(response)[0].text) - time.time() + 10
+                timestamp - time.time() + 10
             )
-            return next_issue_time
+    con = sqlite3.connect("nationstates_ai.db")
+    cur = con.cursor()
+    if cur.execute("SELECT name FROM sqlite_master WHERE name='next_issue_time'").fetchone() is None:
+        cur.execute("CREATE TABLE next_issue_time(nation, timestamp)")
+    data = (nation, timestamp)
+    cur.execute("DELETE FROM next_issue_time WHERE nation = ?", (nation,))
+    con.commit()
+    cur.execute("""INSERT INTO next_issue_time VALUES(?, ?)""", data)
+    con.commit()
+    return next_issue_time
 
-
-async def ns_ai_bot(nation, password, headers, hf_url, prompt, user_agent, index: int):
+async def startup_ratelimit(nation, time):
     print(
         f"""Nation {nation} prepared. 
-    Sleeping for {index * 30} seconds before starting to avoid rate limits..."""
+        Sleeping for {time} seconds before starting to avoid rate limits..."""
     )
     logging.info(
         f"""Nation {nation} prepared. 
-    Sleeping for {index * 30} seconds before starting to avoid rate limits..."""
+        Sleeping for {time} seconds before starting to avoid rate limits..."""
     )
-    await asyncio.sleep(index * 30)
+    await asyncio.sleep(time)
     print(
         f"""Nation {nation} has woke up and will start automatically answering issues!"""
     )
     logging.info(
         f"""Nation {nation} has woke up and will start automatically answering issues!"""
     )
+async def ns_ai_bot(nation, password, headers, hf_url, prompt, user_agent, time: int):
+    await startup_ratelimit(nation, time)
     while True:
         ns_session = aiohttp.ClientSession(
             headers={"X-Password": password, "User-Agent": user_agent + " Nationstates AI v0.1.2-alpha"}

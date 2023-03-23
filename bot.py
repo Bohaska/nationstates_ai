@@ -3,6 +3,8 @@ import asyncio
 import logging
 import dotenv
 import json
+import sqlite3
+import time
 
 logging.basicConfig(
     filename="logs.log",
@@ -27,19 +29,38 @@ PROMPTS = json.loads(env_variables["PROMPTS"])
 async def run_all_ais(
     user_agent, hf_api_token, api_url, ns_passwords, nations, prompts
 ):
+    con = sqlite3.connect("nationstates_ai.db")
+    cur = con.cursor()
     ns_ai_coroutines = []
+    counter = 0
     for index in range(len(ns_passwords)):
-        ns_ai_coroutines.append(
-            ns_ai_bot(
-                nations[index],
-                ns_passwords[index],
-                {"Authorization": f"Bearer {hf_api_token}"},
-                api_url,
-                prompts[index],
-                user_agent,
-                index,
+        if cur.execute("SELECT name FROM sqlite_master WHERE name='next_issue_time'").fetchone() is not None:
+            timestamp = cur.execute("SELECT timestamp FROM next_issue_time WHERE nation = ?", (nations[index],)).fetchone()
+            if timestamp is not None and timestamp > time.time():
+                ns_ai_coroutines.append(
+                    ns_ai_bot(
+                        nations[index],
+                        ns_passwords[index],
+                        {"Authorization": f"Bearer {hf_api_token}"},
+                        api_url,
+                        prompts[index],
+                        user_agent,
+                        timestamp - time.time() + 10,
+                    )
+                )
+        else:
+            ns_ai_coroutines.append(
+                ns_ai_bot(
+                    nations[index],
+                    ns_passwords[index],
+                    {"Authorization": f"Bearer {hf_api_token}"},
+                    api_url,
+                    prompts[index],
+                    user_agent,
+                    counter * 10,
+                )
             )
-        )
+            counter += 1
     thing = await asyncio.gather(*ns_ai_coroutines)
     return thing
 
