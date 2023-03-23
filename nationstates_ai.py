@@ -3,7 +3,7 @@ import logging
 import time
 import aiohttp
 import asyncio
-import sqlite3
+import aiosqlite
 
 logging.basicConfig(
     filename="logs.log",
@@ -40,9 +40,7 @@ async def manage_ratelimit(response: aiohttp.ClientResponse):
         logging.info(
             f"Resumed server after sleeping for 30 seconds to avoid rate-limits."
         )
-        print(
-            f"Resumed server after sleeping for 30 seconds to avoid rate-limits."
-        )
+        print(f"Resumed server after sleeping for 30 seconds to avoid rate-limits.")
 
 
 async def parse_issue(issue_text):
@@ -222,20 +220,22 @@ async def time_to_next_issue(nation: str, ns_session: aiohttp.ClientSession):
         async with ns_session.get(url, params=params) as response:
             response = await response.text()
             timestamp = int(ElementTree.fromstring(response)[0].text)
-            next_issue_time = (
-                timestamp - time.time() + 10
-            )
-    con = sqlite3.connect("nationstates_ai.db")
-    cur = con.cursor()
-    if cur.execute("SELECT name FROM sqlite_master WHERE name='next_issue_time'").fetchone() is None:
-        cur.execute("CREATE TABLE next_issue_time(nation, timestamp)")
+            next_issue_time = timestamp - time.time() + 10
+    con = await aiosqlite.connect("nationstates_ai.db")
+    cursor = await con.execute(
+        "SELECT name FROM sqlite_master WHERE name='next_issue_time'"
+    )
+    table = await cursor.fetchone()
+    if table is None:
+        await con.execute("CREATE TABLE next_issue_time(nation, timestamp)")
     data = (nation, timestamp)
-    cur.execute("DELETE FROM next_issue_time WHERE nation = ?", (nation,))
-    con.commit()
-    cur.execute("""INSERT INTO next_issue_time VALUES(?, ?)""", data)
-    con.commit()
-    con.close()
+    await con.execute("DELETE FROM next_issue_time WHERE nation = ?", (nation,))
+    await con.commit()
+    await con.execute("""INSERT INTO next_issue_time VALUES(?, ?)""", data)
+    await con.commit()
+    await con.close()
     return next_issue_time
+
 
 async def startup_ratelimit(nation, time):
     print(
@@ -253,11 +253,18 @@ async def startup_ratelimit(nation, time):
     logging.info(
         f"""Nation {nation} has woke up and will start automatically answering issues!"""
     )
-async def ns_ai_bot(nation, password, headers, hf_url, prompt, user_agent, time: int):
-    await startup_ratelimit(nation, time)
+
+
+async def ns_ai_bot(
+    nation, password, headers, hf_url, prompt, user_agent, wait_time: int
+):
+    await startup_ratelimit(nation, wait_time)
     while True:
         ns_session = aiohttp.ClientSession(
-            headers={"X-Password": password, "User-Agent": user_agent + " Nationstates AI v0.1.2-alpha"}
+            headers={
+                "X-Password": password,
+                "User-Agent": user_agent + " Nationstates AI v0.1.2-alpha",
+            }
         )
         issues = await get_issues(nation, ns_session)
         new_session = await execute_issues(
