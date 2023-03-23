@@ -61,6 +61,7 @@ async def run_all_ais(
                 )
             )
             counter += 1
+    con.close()
     thing = await asyncio.gather(*ns_ai_coroutines)
     return thing
 

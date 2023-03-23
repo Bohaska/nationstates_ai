@@ -234,6 +234,7 @@ async def time_to_next_issue(nation: str, ns_session: aiohttp.ClientSession):
     con.commit()
     cur.execute("""INSERT INTO next_issue_time VALUES(?, ?)""", data)
     con.commit()
+    con.close()
     return next_issue_time
 
 async def startup_ratelimit(nation, time):
