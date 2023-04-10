@@ -33,14 +33,15 @@ class Issue:
 
 
 async def manage_ratelimit(response: aiohttp.ClientResponse):
-    if int(response.headers["X-Ratelimit-Requests-Seen"]) > 30:
-        logging.info(f"Pausing server for 30 seconds to avoid rate-limits.")
-        print(f"Pausing server for 30 seconds to avoid rate-limits.")
-        time.sleep(30)
+    if int(response.headers["RateLimit-Remaining"]) < 10:
+        sleep_time = int(response.headers["RateLimit-Reset"])
+        logging.info(f"Pausing server for {sleep_time} seconds to avoid rate-limits.")
+        print(f"Pausing server for {sleep_time} seconds to avoid rate-limits.")
+        time.sleep(sleep_time)
         logging.info(
-            f"Resumed server after sleeping for 30 seconds to avoid rate-limits."
+            f"Resumed server after sleeping for {sleep_time} seconds to avoid rate-limits."
         )
-        print(f"Resumed server after sleeping for 30 seconds to avoid rate-limits.")
+        print(f"Resumed server after sleeping for {sleep_time} seconds to avoid rate-limits.")
 
 
 async def parse_issue(issue_text):
@@ -86,6 +87,7 @@ async def huggingface_query(payload, url, session: aiohttp.ClientSession):
                     del testing_dict
                     return response
                 except KeyError:
+                    print(response)
                     print("AI is offline, retrying in 30 seconds...")
                     logging.error("AI is offline, retrying in 30 seconds...")
                     await asyncio.sleep(30)
@@ -152,13 +154,15 @@ async def execute_issues(
     logging.info(f"Executing {len(issues)} issues...")
     execute = []
     for issue in issues:
-        logging.info(f"Contacting AI...")
+        logging.info("Contacting AI...")
+        print("Contacting AI...")
         selected_option = await huggingface_query(
             {
                 "inputs": {
                     "question": format_question(issue, prompt),
                     "context": format_issue(issue),
-                }
+                },
+                "wait_for_model": True
             },
             hf_url,
             huggingface_session,
@@ -237,16 +241,16 @@ async def time_to_next_issue(nation: str, ns_session: aiohttp.ClientSession):
     return next_issue_time
 
 
-async def startup_ratelimit(nation, time):
+async def startup_ratelimit(nation, wait_time):
     print(
         f"""Nation {nation} prepared. 
-        Sleeping for {time} seconds before starting to avoid rate limits..."""
+        Sleeping for {wait_time} seconds before starting to avoid rate limits..."""
     )
     logging.info(
         f"""Nation {nation} prepared. 
-        Sleeping for {time} seconds before starting to avoid rate limits..."""
+        Sleeping for {wait_time} seconds before starting to avoid rate limits..."""
     )
-    await asyncio.sleep(time)
+    await asyncio.sleep(wait_time)
     print(
         f"""Nation {nation} has woke up and will start automatically answering issues!"""
     )
