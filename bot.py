@@ -1,10 +1,11 @@
 from nationstates_ai import ns_ai_bot
 import asyncio
 import logging
-import dotenv
 import json
 import aiosqlite
 import time
+import os
+import sys
 
 logging.basicConfig(
     filename="logs.log",
@@ -14,16 +15,32 @@ logging.basicConfig(
     level=logging.DEBUG,
 )
 
-dotenv.load_dotenv(dotenv.find_dotenv())
-env_variables = dotenv.dotenv_values()
-
-USER_AGENT = env_variables["USER_AGENT"]
+USER_AGENT = os.environ.get("USER_AGENT", "i.didnt.set.a.user.agent@disappointed.sad AI Issue Answering")
 """User agents need to include a form of contacting you as per NS API rules."""
-HF_API_TOKEN = env_variables["HF_API_TOKEN"]
-API_URL = env_variables["API_URL"]
-NATIONSTATES_PASSWORDS = json.loads(env_variables["NATIONSTATES_PASSWORDS"])
-NATIONS = json.loads(env_variables["NATIONS"])
-PROMPTS = json.loads(env_variables["PROMPTS"])
+try:
+    HF_API_TOKEN = os.environ["HF_API_TOKEN"]
+except KeyError:
+    print("Input your Huggingface API token into your .env file under the name of HF_API_TOKEN.")
+    sys.exit(0)
+API_URL = os.environ.get("API_URL", "https://api-inference.huggingface.co/models/distilbert-base-cased-distilled-squad")
+try:
+    NATIONS = json.loads(os.environ["NATIONS"])
+except KeyError:
+    print("Input your Nationstates nations into your .env file under the name of NATIONS. "
+          "See an example .env file at https://github.com/Bohaska/nationstates_ai/blob/main/.env.")
+    sys.exit(0)
+try:
+    NATIONSTATES_PASSWORDS = json.loads(os.environ["NATIONSTATES_PASSWORDS"])
+except KeyError:
+    print("Input your Nationstates passwords into your .env file under the name of NATIONSTATES_PASSWORDS. "
+          "See an example .env file at https://github.com/Bohaska/nationstates_ai/blob/main/.env.")
+    sys.exit(0)
+try:
+    PROMPTS = json.loads(os.environ["PROMPTS"])
+except KeyError:
+    print("Input the prompts for your nations into your .env file under the name of PROMPTS. "
+          "See an example .env file at https://github.com/Bohaska/nationstates_ai/blob/main/.env.")
+    sys.exit(0)
 
 
 async def run_all_ais(
